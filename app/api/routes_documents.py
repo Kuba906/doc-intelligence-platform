@@ -1,49 +1,44 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
 from typing import Optional
 
-from app.core.database import get_db
-from app.models.database import Document, DocumentStatus
+from app.core.deps import PaginationParams, TenantParams, get_document_service
+from app.models.database import DocumentStatus
 from app.models.schemas import DocumentDetail, DocumentListResponse, DocumentListItem
+from app.services.document_service import DocumentService
 
 router = APIRouter()
 
 
 @router.get("", response_model=DocumentListResponse)
 async def list_documents(
-    tenant_id: str = Query(default="demo"),
+    tenant: TenantParams = Depends(),
+    pagination: PaginationParams = Depends(),
     status_filter: Optional[DocumentStatus] = None,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    service: DocumentService = Depends(get_document_service)
 ):
     """List documents with pagination and filtering"""
-    query = db.query(Document).filter(Document.tenant_id == tenant_id)
-
-    if status_filter:
-        query = query.filter(Document.status == status_filter)
-
-    total = query.count()
-    documents = query.order_by(Document.uploaded_at.desc()) \
-        .offset((page - 1) * page_size) \
-        .limit(page_size) \
-        .all()
+    documents, total = service.list_documents(
+        tenant_id=tenant.tenant_id,
+        status_filter=status_filter,
+        skip=pagination.skip,
+        limit=pagination.page_size
+    )
 
     return DocumentListResponse(
         documents=[DocumentListItem.from_orm(doc) for doc in documents],
         total=total,
-        page=page,
-        page_size=page_size
+        page=pagination.page,
+        page_size=pagination.page_size
     )
 
 
 @router.get("/{document_id}", response_model=DocumentDetail)
 async def get_document(
     document_id: str,
-    db: Session = Depends(get_db)
+    service: DocumentService = Depends(get_document_service)
 ):
     """Get document details by ID"""
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = service.get_by_id(document_id)
 
     if not document:
         raise HTTPException(
@@ -57,21 +52,16 @@ async def get_document(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: str,
-    db: Session = Depends(get_db)
+    service: DocumentService = Depends(get_document_service)
 ):
     """Delete a document"""
-    document = db.query(Document).filter(Document.id == document_id).first()
+    deleted = service.delete_document(document_id)
 
-    if not document:
+    if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document {document_id} not found"
         )
-
-    # TODO: Delete from blob storage as well
-
-    db.delete(document)
-    db.commit()
 
     return None
 
@@ -79,21 +69,16 @@ async def delete_document(
 @router.post("/{document_id}/reprocess", status_code=status.HTTP_202_ACCEPTED)
 async def reprocess_document(
     document_id: str,
-    db: Session = Depends(get_db)
+    service: DocumentService = Depends(get_document_service)
 ):
     """Trigger reprocessing of a document"""
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = service.reprocess_document(document_id)
 
     if not document:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Document {document_id} not found"
         )
-
-    # Reset status
-    document.status = DocumentStatus.UPLOADED
-    document.retry_count += 1
-    db.commit()
 
     # Trigger background job
     from app.workers.process_documents import process_document_task

@@ -35,6 +35,7 @@ Multi-tenant SaaS for intelligent document processing:
 **Frontend:**
 - Streamlit (quick dashboard)
 - OR Angular 17 (for full SPA)
+- still in progress
 
 **Infrastructure:**
 - Docker + Docker Compose
@@ -183,20 +184,6 @@ pytest --cov=app tests/
 pytest tests/test_upload.py -v
 ```
 
-## 📊 Tech Matches
-
-**PwC AI Engineer:** 70% match
-- ✅ Python, FastAPI
-- ✅ Azure AI services
-- ✅ NLP (classification, NER)
-- ✅ Document processing
-
-**Deloitte GenAI:** 95% match
-- ✅ Document extraction (core JD!)
-- ✅ GenAI integration (GPT-4o)
-- ✅ Azure platform
-- ✅ Quality mechanisms
-
 ## 📚 Resources
 
 - [Azure Document Intelligence](https://learn.microsoft.com/azure/ai-services/document-intelligence/)
@@ -211,5 +198,3 @@ MIT
 ## 👤 Author
 
 Jakub Szuper
-- Building for: PwC AI Engineer + Deloitte GenAI Developer roles
-- Part of: Python AI Engineer portfolio (alongside RAG Tourism Platform)
